@@ -4,10 +4,13 @@ from pyspark import SparkContext
 from pyspark import SparkFiles
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
+from hdfs import InsecureClient
+import hdfs
 
 import string
 import json
 import itertools
+import time
 
 import nltk
 from nltk.tokenize import word_tokenize
@@ -29,7 +32,7 @@ def tokenize(text):
     return [w for w in no_stopwords if w]
 
 def tokenize_tweet(tweet):
-	return (tweet, tokenize(tweet))
+	return (tweet[0], tokenize(tweet[1]))
 
 def score_tokens(tokens, word_list):
 	if len(tokens) == 0:
@@ -55,6 +58,7 @@ def score_tweets(iterator):
     negative_words = [line.strip() for line in open(SparkFiles.get("neg-words.txt"))]
     return itertools.imap(lambda x: score_tweet(x, positive_words, negative_words), iterator)
 
+
 #def ziptogether(Dstream):
 #    Zipped=Dstream.zip(Topic)
 #    return Zipped
@@ -64,12 +68,20 @@ if __name__ == "__main__":
         print("Usage: kafka_wordcount.py <zk> <topic>", file=sys.stderr)
         exit(-1)
 
+    f = open("Google-analysis", 'a')
+    client = InsecureClient('http://7.11.230.242:50070', user='training')
+
+    def saveToFile(time, rdd):
+        # myfile = open("google-analysis2", "ab+")
+        # rdd.foreach(lambda x: myfile.write(str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n'))
+        rdd.foreach(lambda x: client.write('/google-result', data=str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n', append=True))
+
     sc = SparkContext(appName="PythonStreamingKafkaWordCount")
 
     sc.addFile("/home/zhenchang/Downloads/pos-words.txt")
     sc.addFile("/home/zhenchang/Downloads/neg-words.txt")
 
-    ssc = StreamingContext(sc, 5)
+    ssc = StreamingContext(sc, 2)
 
     zkQuorum, topic = sys.argv[1:]
     kvs = KafkaUtils.createStream(ssc, zkQuorum, "spark-streaming-consumer", {topic: 1})
@@ -77,31 +89,17 @@ if __name__ == "__main__":
     # parse json structure
     vs = kvs.map(lambda entry : entry[1]).map(json.loads)
 
-    # filter out comments without 'body' and extract 'subreddit' as topic
-    Topic = vs.filter(lambda x: 'body' in x).map(lambda x: x['subreddit'])
+    # filter out comments with both 'body' and 'subreddit'
+    cleaned = vs.filter(lambda x: 'body' in x).filter(lambda x: 'subreddit' in x)
+
+    # transform the RDD
+    paired=cleaned.map(lambda x: (x['subreddit'], x['body']))
+
 
     # score the comment
-    Scored_PostedComment = vs.filter(lambda x: 'body' in x).map(lambda x: x['body'])\
-        .map(tokenize_tweet).mapPartitions(score_tweets)
-
-    # extract the score
-    Score = Scored_PostedComment.map(lambda x: x[1])
-
-    #Scored_PostedComment.pprint()
-
-    #Topic.pprint()
-    Score.pprint()
-    aaa=Score.union(Topic) # no error reported, but no effect either
-    # aaa.pprint()
-
-    #bbb=Score.transform(lambda rdd: rdd.append(Topic))
-    #bbb.pprint()
-
-    # zip back with topic-level
-    #Paired = Score.foreachRDD(lambda rdd: rdd.foreach(zip(Topic).SortByKey(False))
-    #Paired.pprint()
-    #(Topic).SortByKey(False)
-    #Paired.take(5)
+    Scored_Comments = paired.map(tokenize_tweet).mapPartitions(score_tweets)
+    Scored_Comments.pprint()
+    Scored_Comments.foreachRDD(saveToFile)
 
     ssc.start()
     ssc.awaitTermination()

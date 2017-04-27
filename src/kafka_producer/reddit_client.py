@@ -13,7 +13,7 @@ Data_Path = "/mnt/hgfs/OneDrive/Documents/2015.12-2017.06 NUS/Big Data Engineeri
 class RedditClient:
     CLIENT_ID = "Ba1ko5k74vJeow"
     CLIENT_SECRET = "8162uBJkcz2R6LNg4DFh0DSO-FI"
-    kafka_server = "127.0.0.1:9092"
+    kafka_server = "7.11.230.242:9092"
 
     def __init__(self):
         self.producer = KafkaProducer(bootstrap_servers=self.kafka_server)
@@ -38,11 +38,12 @@ class RedditClient:
                 print("sending submission...")
                 self.producer.send('submissions', ComplexEncoder(indent=4).encode(submission.__dict__).encode())
                 print("submission sent.")
+                time.sleep(2)
                 for comment in submission.comments.list():
                     print("sending comment...")
-                    self.producer.send('comments', ComplexEncoder(indent=4).encode(comment.__dict__).encode())
+                    self.producer.send('comments', ComplexEncoder().encode(comment.__dict__).encode())
                     print("comment sent.")
-                time.sleep(1)
+                    time.sleep(2)
 
 class ComplexEncoder(json.JSONEncoder):
 
