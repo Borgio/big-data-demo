@@ -11,6 +11,7 @@ import string
 import json
 import itertools
 import time
+from kafka import KafkaProducer
 
 import nltk
 from nltk.tokenize import word_tokenize
@@ -20,6 +21,8 @@ from nltk.stem.porter import PorterStemmer
 nltk.download('punkt')
 PUNCTUATION = set(string.punctuation)
 STOPWORDS = set(stopwords.words('english'))
+kafka_server = "7.11.230.242:9092"
+producer = KafkaProducer(bootstrap_servers=kafka_server)
 
 def tokenize(text):
     tokens = word_tokenize(text)
@@ -74,7 +77,8 @@ if __name__ == "__main__":
     def saveToFile(time, rdd):
         # myfile = open("google-analysis2", "ab+")
         # rdd.foreach(lambda x: myfile.write(str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n'))
-        rdd.foreach(lambda x: client.write('/google-result', data=str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n', append=True))
+        print('>>>>>' + str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n')
+        rdd.foreach(lambda x: producer.send('sentiments', str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n'))
 
     sc = SparkContext(appName="PythonStreamingKafkaWordCount")
 

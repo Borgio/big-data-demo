@@ -33,17 +33,17 @@ class RedditClient:
             print('count: ' + count.__str__())
             timestamp = 'timestamp:2764800..' + current
             for submission in subreddit.search(query=timestamp, sort='new', syntax='cloudsearch'):
-                count += 1
                 current = (int)(submission.created_utc).__str__()
                 print("sending submission...")
                 self.producer.send('submissions', ComplexEncoder(indent=4).encode(submission.__dict__).encode())
                 print("submission sent.")
-                time.sleep(2)
                 for comment in submission.comments.list():
                     print("sending comment...")
                     self.producer.send('comments', ComplexEncoder().encode(comment.__dict__).encode())
                     print("comment sent.")
-                    time.sleep(2)
+                    count += 1
+                    print(count)
+                    time.sleep(1)
 
 class ComplexEncoder(json.JSONEncoder):
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     reddit_factory = RedditClient()
     reddit = reddit_factory.get_reddit_client()
     print(reddit.user.me())
-    reddit_factory.retrieve_subreddit("learnpython")
+    reddit_factory.retrieve_subreddit("GoogleCardboard")
     # last = 0
     # for submission in reddit.subreddit("/samsung").hot(limit=1000):
     #     last = submission.fullname
