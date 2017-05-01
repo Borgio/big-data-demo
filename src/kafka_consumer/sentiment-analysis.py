@@ -11,7 +11,6 @@ import string
 import json
 import itertools
 import time
-from kafka import KafkaProducer
 
 import nltk
 from nltk.tokenize import word_tokenize
@@ -21,8 +20,6 @@ from nltk.stem.porter import PorterStemmer
 nltk.download('punkt')
 PUNCTUATION = set(string.punctuation)
 STOPWORDS = set(stopwords.words('english'))
-kafka_server = "7.11.230.242:9092"
-producer = KafkaProducer(bootstrap_servers=kafka_server)
 
 def tokenize(text):
     tokens = word_tokenize(text)
@@ -71,19 +68,15 @@ if __name__ == "__main__":
         print("Usage: kafka_wordcount.py <zk> <topic>", file=sys.stderr)
         exit(-1)
 
-    f = open("Google-analysis", 'a')
     client = InsecureClient('http://7.11.230.242:50070', user='training')
 
     def saveToFile(time, rdd):
-        # myfile = open("google-analysis2", "ab+")
-        # rdd.foreach(lambda x: myfile.write(str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n'))
-        print('>>>>>' + str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n')
-        rdd.foreach(lambda x: producer.send('sentiments', str(time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n'))
+        rdd.foreach(lambda x: client.write('/google-result', data=str(time.time()) + ' ' + str(x[0]) + ' ' + str(x[1]) +  '\n', append=True))
 
-    sc = SparkContext(appName="PythonStreamingKafkaWordCount")
+    sc = SparkContext(appName="Reddit-Sentiment-Analysis")
 
-    sc.addFile("/home/zhenchang/Downloads/pos-words.txt")
-    sc.addFile("/home/zhenchang/Downloads/neg-words.txt")
+    sc.addFile("/home/training/Downloads/pos-words.txt")
+    sc.addFile("/home/training/Downloads/neg-words.txt")
 
     ssc = StreamingContext(sc, 2)
 
@@ -104,6 +97,7 @@ if __name__ == "__main__":
     Scored_Comments = paired.map(tokenize_tweet).mapPartitions(score_tweets)
     Scored_Comments.pprint()
     Scored_Comments.foreachRDD(saveToFile)
+   # Scored_Comments.map(lambda x: client.write('/google-result', data=time.time) + ' ' + 'str(x[0])' + ' ' + 'str(x[1])' + '\n', append=True)).count()
 
     ssc.start()
     ssc.awaitTermination()
